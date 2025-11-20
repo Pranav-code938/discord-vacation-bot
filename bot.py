@@ -32,7 +32,7 @@ if not TOKEN:
     raise SystemExit
 
 # Name of the Google Sheet (the name shown at the top of the sheet)
-SHEET_NAME = "VacationBot"  # change this if your sheet has a different name
+SHEET_NAME = "Vacations"  # change this if your sheet has a different name
 
 # =========================
 # GOOGLE SHEETS SETUP

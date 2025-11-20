@@ -1,3 +1,16 @@
+from flask import Flask
+import threading
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is alive!"
+
+def run_web():
+    app.run(host='0.0.0.0', port=8080)
+
+
 import os
 import discord
 from discord import app_commands
@@ -172,6 +185,11 @@ async def vacation_view(
 
 # Register the group with the bot
 bot.tree.add_command(vacation_group)
+
+# Start the web server on a separate thread
+t = threading.Thread(target=run_web)
+t.start()
+
 
 # Run the bot
 bot.run(TOKEN)

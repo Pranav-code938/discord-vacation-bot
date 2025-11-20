@@ -38,7 +38,11 @@ SHEET_NAME = "VacationBot"  # change this if your sheet has a different name
 # GOOGLE SHEETS SETUP
 # =========================
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
+]
+
 
 # This expects a file called "service_account.json" in the same folder.
 # On Render, we will create this as a Secret File.

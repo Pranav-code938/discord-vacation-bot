@@ -1,17 +1,7 @@
-from flask import Flask
+import os
 import threading
 
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "Bot is alive!"
-
-def run_web():
-    app.run(host='0.0.0.0', port=8080)
-
-
-import os
+from flask import Flask
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -20,44 +10,44 @@ import gspread
 from google.oauth2 import service_account
 
 # =========================
-# CONFIGURATION
+# CONFIG
 # =========================
 
-# Discord bot token is taken from an environment variable named DISCORD_TOKEN
-# We will set this in Render later.
-TOKEN = os.environ.get("DISCORD_TOKEN")
+print("bot.py starting...")
 
+# REPLACE THIS WITH YOUR SERVER ID (number only, no quotes)
+GUILD_ID = 1379229854263808032  # <<< put your server ID here
+
+TOKEN = os.environ.get("DISCORD_TOKEN")
 if not TOKEN:
     print("ERROR: DISCORD_TOKEN environment variable not set.")
-    raise SystemExit
+    raise SystemExit(1)
 
-# Name of the Google Sheet (the name shown at the top of the sheet)
-SHEET_NAME = "Vacations"  # change this if your sheet has a different name
-
-# =========================
-# GOOGLE SHEETS SETUP
-# =========================
+# EXACT Google Sheet name (top-left in the sheet)
+SHEET_NAME = "Vacations"      # <<< change if your sheet is named differently
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive",
 ]
 
-
-# This expects a file called "service_account.json" in the same folder.
-# On Render, we will create this as a Secret File.
+print("Loading service_account.json...")
 creds = service_account.Credentials.from_service_account_file(
     "service_account.json",
     scopes=SCOPES,
 )
 
+print("Authorizing gspread...")
 gspread_client = gspread.authorize(creds)
-sheet = gspread_client.open(SHEET_NAME).sheet1  # first worksheet/tab
+sheet = gspread_client.open(SHEET_NAME).sheet1
+print("Google Sheets connected.")
 
+# =========================
+# GOOGLE SHEETS HELPERS
+# =========================
 
 def find_row(username: str):
-    """Find the row number where this username is stored (in column A)."""
-    usernames = sheet.col_values(1)  # all values in column A
+    usernames = sheet.col_values(1)  # column A
     for index, name in enumerate(usernames, start=1):
         if name.lower() == username.lower():
             return index
@@ -65,19 +55,15 @@ def find_row(username: str):
 
 
 def set_vacation(username: str, start_date: str, end_date: str):
-    """Add or update a vacation entry in the sheet."""
     row = find_row(username)
     if row is None:
-        # Add new row at the bottom
         sheet.append_row([username, start_date, end_date])
     else:
-        # Update existing row
-        sheet.update_cell(row, 2, start_date)  # column B (Start_date)
-        sheet.update_cell(row, 3, end_date)    # column C (End_date)
+        sheet.update_cell(row, 2, start_date)  # B
+        sheet.update_cell(row, 3, end_date)    # C
 
 
 def remove_vacation(username: str) -> bool:
-    """Remove a vacation entry. Returns True if found and deleted."""
     row = find_row(username)
     if row is None:
         return False
@@ -86,42 +72,29 @@ def remove_vacation(username: str) -> bool:
 
 
 def get_vacation(username: str):
-    """Get vacation entry as a dict, or None if not found."""
     row = find_row(username)
     if row is None:
         return None
     data = sheet.row_values(row)
-    # data[0] = Username, data[1] = Start_date, data[2] = End_date
     if len(data) < 3:
         return None
-    return {
-        "username": data[0],
-        "start": data[1],
-        "end": data[2],
-    }
+    return {"username": data[0], "start": data[1], "end": data[2]}
+
 
 def list_vacations():
-    """Return a list of all vacation rows as dicts."""
+    """Return all vacation records as a list of dicts."""
     rows = sheet.get_all_values()
     vacations = []
-
-    # rows[0] is the header row: Name | Start | End
+    # row 0 is header: Name | Start | End
     for row in rows[1:]:
         if len(row) >= 3 and row[0]:
             vacations.append(
-                {
-                    "username": row[0],
-                    "start": row[1],
-                    "end": row[2],
-                }
+                {"username": row[0], "start": row[1], "end": row[2]}
             )
-
     return vacations
 
-
-
 # =========================
-# DISCORD BOT SETUP
+# DISCORD BOT
 # =========================
 
 intents = discord.Intents.default()
@@ -132,13 +105,13 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 async def on_ready():
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
     try:
-        synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} command(s).")
+        guild = discord.Object(id=GUILD_ID)
+        synced = await bot.tree.sync(guild=guild)
+        print(f"Synced {len(synced)} command(s) to guild {GUILD_ID}.")
     except Exception as e:
         print("Error syncing commands:", e)
 
 
-# Create a slash command group: /vacation ...
 vacation_group = app_commands.Group(
     name="vacation",
     description="Manage vacation entries",
@@ -148,8 +121,8 @@ vacation_group = app_commands.Group(
 @vacation_group.command(name="add", description="Add a vacation entry")
 @app_commands.describe(
     username="The username or member name",
-    start_date="Start date (e.g. 2025-11-21)",
-    end_date="End date (e.g. 2025-11-25)",
+    start_date="Start date (e.g. 27th November)",
+    end_date="End date (e.g. 29th November)",
 )
 async def vacation_add(
     interaction: discord.Interaction,
@@ -165,9 +138,7 @@ async def vacation_add(
 
 
 @vacation_group.command(name="remove", description="Remove a vacation entry")
-@app_commands.describe(
-    username="The username or member name",
-)
+@app_commands.describe(username="The username or member name")
 async def vacation_remove_cmd(
     interaction: discord.Interaction,
     username: str,
@@ -186,9 +157,7 @@ async def vacation_remove_cmd(
 
 
 @vacation_group.command(name="view", description="View a vacation entry")
-@app_commands.describe(
-    username="The username or member name",
-)
+@app_commands.describe(username="The username or member name")
 async def vacation_view(
     interaction: discord.Interaction,
     username: str,
@@ -205,6 +174,7 @@ async def vacation_view(
             ephemeral=True,
         )
 
+
 @vacation_group.command(name="list", description="List all vacation entries")
 async def vacation_list(
     interaction: discord.Interaction,
@@ -218,13 +188,13 @@ async def vacation_list(
         )
         return
 
-    lines = []
-    for v in vacations:
-        lines.append(f"• **{v['username']}**: `{v['start']}` → `{v['end']}`")
-
+    lines = [
+        f"• **{v['username']}**: `{v['start']}` → `{v['end']}`"
+        for v in vacations
+    ]
     message = "\n".join(lines)
 
-    # Safety so we don't hit Discord's 2000-char limit if the list is huge
+    # just in case the sheet gets massive
     if len(message) > 1900:
         message = "\n".join(lines[:40]) + "\n… (and more)"
 
@@ -234,14 +204,35 @@ async def vacation_list(
     )
 
 
-
-# Register the group with the bot
 bot.tree.add_command(vacation_group)
 
-# Start the web server on a separate thread
-t = threading.Thread(target=run_web)
-t.start()
+# =========================
+# FLASK WEB SERVER
+# =========================
+
+app = Flask(__name__)
 
 
-# Run the bot
-bot.run(TOKEN)
+@app.route("/")
+def home():
+    return "Bot is alive!"
+
+
+def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    print(f"Starting Flask web server on port {port}...")
+    app.run(host="0.0.0.0", port=port)
+
+
+# =========================
+# MAIN
+# =========================
+
+if __name__ == "__main__":
+    print("Starting web server thread...")
+    t = threading.Thread(target=run_web)
+    t.daemon = True
+    t.start()
+
+    print("Starting Discord bot...")
+    bot.run(TOKEN)

@@ -103,13 +103,15 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
+    # This runs when the bot is fully connected
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+
     try:
-        guild = discord.Object(id=GUILD_ID)
-        synced = await bot.tree.sync(guild=guild)
-        print(f"Synced {len(synced)} command(s) to guild {GUILD_ID}.")
+        synced = await bot.tree.sync()  # global sync
+        print(f"Synced {len(synced)} command(s) globally.")
     except Exception as e:
         print("Error syncing commands:", e)
+
 
 
 vacation_group = app_commands.Group(

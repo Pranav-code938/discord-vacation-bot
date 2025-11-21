@@ -100,6 +100,25 @@ def get_vacation(username: str):
         "end": data[2],
     }
 
+def list_vacations():
+    """Return a list of all vacation rows as dicts."""
+    rows = sheet.get_all_values()
+    vacations = []
+
+    # rows[0] is the header row: Name | Start | End
+    for row in rows[1:]:
+        if len(row) >= 3 and row[0]:
+            vacations.append(
+                {
+                    "username": row[0],
+                    "start": row[1],
+                    "end": row[2],
+                }
+            )
+
+    return vacations
+
+
 
 # =========================
 # DISCORD BOT SETUP
@@ -185,6 +204,35 @@ async def vacation_view(
             f"📅 **{data['username']}**: `{data['start']}` → `{data['end']}`",
             ephemeral=True,
         )
+
+@vacation_group.command(name="list", description="List all vacation entries")
+async def vacation_list(
+    interaction: discord.Interaction,
+):
+    vacations = list_vacations()
+
+    if not vacations:
+        await interaction.response.send_message(
+            "📭 No vacations recorded yet.",
+            ephemeral=True,
+        )
+        return
+
+    lines = []
+    for v in vacations:
+        lines.append(f"• **{v['username']}**: `{v['start']}` → `{v['end']}`")
+
+    message = "\n".join(lines)
+
+    # Safety so we don't hit Discord's 2000-char limit if the list is huge
+    if len(message) > 1900:
+        message = "\n".join(lines[:40]) + "\n… (and more)"
+
+    await interaction.response.send_message(
+        message,
+        ephemeral=True,
+    )
+
 
 
 # Register the group with the bot
